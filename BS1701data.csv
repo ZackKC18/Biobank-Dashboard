@@ -1,0 +1,4 @@
+"Participant_PPID","Participant_Registration Date","Participant_Gender","Visit_Clinical Diagnosis (Deprecated)","Visit_Name","Specimen_Type","Specimen_Anatomic Site","Specimen_Collection Date","Specimen_Barcode","Specimen_Class","Specimen_Pathological Status","Specimen_Container Name","Specimen_Container Position","Collection Protocol_Short Title"
+190124,"20/6/2019 10:40","Female","Neuromyelitis optica [Devic]","190124_1","Fresh Tissue","Nervous system, NOS","20/6/2019 15:37","19ATN000039","Tissue","Non-Malignant","N03C4R5-B28",70,"BS1701"
+190124,"20/6/2019 10:40","Female","Neuromyelitis optica [Devic]","190124_1","Fresh Tissue","Nervous system, NOS","20/6/2019 15:37","19ATN000040","Tissue","Non-Malignant","N03C4R5-B28",71,"BS1701"
+190124,"20/6/2019 10:40","Female","Neuromyelitis optica [Devic]","190124_1","Fresh Tissue","Nervous system, NOS","20/6/2019 15:37","19ATN000041","Tissue","Non-Malignant","N03C4R5-B28",72,"BS1701"

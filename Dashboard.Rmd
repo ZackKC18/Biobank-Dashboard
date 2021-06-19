@@ -1,0 +1,396 @@
+---
+title: "Biobank dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+   # social: [ "twitter", "facebook", "menu"]
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(knitr)
+library(DT)
+library(rpivotTable)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(openintro)
+library(highcharter)
+library(ggvis)
+library(sqldf)
+library(data.table)
+library(shiny)
+library(spData)
+library(sf)
+library(leaflet)
+library(reshape)
+library(tidyr)
+
+```
+
+
+```{r}
+data_melt <-  read.csv("df_melt.csv", header = TRUE,  sep = ",")
+data <- read.csv("df.csv",header = TRUE)
+
+df_table <- as.data.table(data, keep.rownames = TRUE)
+df_table <- select(data,Year,Project,Normal_Tissue,Diseased_Tissue,Not_Specified)
+df8 <-melt(df_table ,id = c("Year","Project"))
+df7 <- sqldf("SELECT variable,sum(value) as value FROM data_melt GROUP BY variable")
+combine <- read.csv("combine.csv",header = TRUE)
+
+Total_plasma <- df7[df7$variable == 'Plasma' , 'value']
+Total_Serum <- df7[df7$variable == 'Serum', 'value']
+Total_Buffy_Coat <- df7[df7$variable == 'Buffy_Coat', 'value']
+
+Total_Fresh_Tissue <- df7[df7$variable == 'Fresh_Tissue' , 'value']
+
+#Total_Project <- length(unique(combine$Project))
+#Total_Patients <- sum(df$Total_patients)
+
+
+```
+
+```{r}
+mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange")
+```
+
+Overall Data Visualization
+=====================================
+
+Row
+-------------------------------------
+
+### Summary dashboard
+
+```{r}
+valueBox(paste("Biobank"),
+         color = "warning")
+```
+
+### Total Project
+
+```{r}
+valueBox(length(unique(combine$Project)),
+         icon = 'fa-building')
+```
+
+### **Total Patients**
+
+```{r}
+valueBox(sum(data$Total_patients),
+         icon = 'fa-building')
+
+```
+
+### Plasma
+
+```{r}
+valueBox(Total_plasma,
+         icon = 'fa-building')
+```
+
+### Serum
+
+```{r}
+valueBox(Total_Serum,
+         icon = 'fa-building')
+```
+
+### Buffy coat
+
+```{r}
+valueBox(Total_Buffy_Coat,
+         icon = 'fa-building')
+```
+
+### Fresh Tissue
+
+```{r}
+valueBox(Total_Fresh_Tissue,
+         icon = 'fa-building')
+```
+
+Row
+-------------------------------
+
+### Pie chart from Specimen_Type
+
+```{r}
+p2 <- data_melt %>%
+  group_by(variable) %>%
+  summarise(sum = sum(value)) %>%
+  #filter(count>50) %>%
+  plot_ly(labels = ~variable,
+          values = ~sum,
+          marker = list(colors = mycolors)) %>%
+  add_pie(hole = 0.2) %>%
+  layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels=F,
+                      showgrid=F))
+p2
+``` 
+
+
+
+### Pie chart from Specimen_Pathological.Status 
+
+```{r}
+  
+p3 <- df8 %>%
+  group_by(variable) %>%
+  summarise(sum = sum(value)) %>%
+  #filter(count>50) %>%
+  plot_ly(labels = ~variable,
+          values = ~sum,
+          marker = list(colors = mycolors)) %>%
+  add_pie(hole = 0.2) %>%
+  layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels=F,
+                      showgrid=F))
+p3
+```
+
+
+
+### Project in each years
+
+```{r}
+
+ggplot(data = combine, 
+       mapping = aes(x = Year, y =Project, color = Specimen_Type)) +
+  geom_point() +
+  scale_x_continuous(name="Year", limits=c(2010, 2020))
+
+```
+
+
+Row
+------------------------------------
+### #line graph specimen type in each year
+
+```{r}
+df9 <-sqldf("SELECT Year,variable,value
+            FROM data_melt
+            GROUP BY Year,variable")
+
+hc <- df9 %>% 
+  hchart('line' , hcaes(x=Year, y=value ,group = variable))
+
+hc
+```
+
+### barchart each specimen type group by project
+
+```{r}
+
+ggplot(data_melt,
+       aes(x= Project,
+           y=value,
+           fill = variable)) +
+  geom_bar(stat = 'identity',
+           position = 'dodge')
+```
+
+Query
+========================================
+
+### query group by year project 
+
+
+```{r}
+ui <- fluidPage(
+  
+  # CSS
+  tags$head(
+    tags$style(HTML("
+      body { background-color: #f2efe9; }
+      .container-fluid { background-color: #fff; width: 1100px; padding: 60px; }
+      .topimg { width: 120px; display: block; margin: 0px auto 40px auto; }
+      .title { text-align: center; }
+      .toprow { margin: 60px 0px; padding: 30px; background-color: #fae8bb; }
+      .filters { margin: 0px auto; }
+      .shiny-input-container { width:100% !important; }
+      .table { padding: 30px; margin-top: 30px; }
+      .leaflet-top { z-index:999 !important; }
+      "))
+    ),
+   
+  # Top image
+  img(class = "topimg", src = "https://www.si.mahidol.ac.th/th/research-academics/research/division_3/biobank/img/2.%E0%B9%80%E0%B8%81%E0%B8%B5%E0%B9%88%E0%B8%A2%E0%B8%A7%E0%B8%81%E0%B8%B1%E0%B8%9A%E0%B9%80%E0%B8%A3%E0%B8%B2/%E0%B8%A7%E0%B8%B1%E0%B8%95%E0%B8%96%E0%B8%B8%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%AA%E0%B8%87%E0%B8%84%E0%B9%8C.jpg"),
+  
+   # Application title
+   h1("Biobank Dashboard", class = "title"),
+   
+   fluidRow(class = "toprow",
+     fluidRow (class = "filters",
+               
+       column(6,
+         # Year Menu
+         selectInput("year", "Year", unique(data_melt$Year))
+       ),
+       
+       
+       column(6,
+         # Project menu
+         selectInput("project", "Project", unique(data_melt$Project) %>% 
+                          # append("All") %>% # Add "All" option
+                           sort()) # Sort options alphabetically
+         )
+     )
+   ),
+   
+   fluidRow (
+     column(6, class = "bar",
+       # Bar Chart
+       plotOutput("specimenBar") )
+     ),
+  
+   fluidRow (class = "table",
+     # Table
+     dataTableOutput("table")
+   )
+   
+)
+
+# Define server logic
+server <- function(input, output, session) {
+
+  # Create bar chart of brands
+  output$specimenBar <- renderPlot( {
+    
+    # Filter data based on selected Style
+    if (input$year != "All") {
+      data_melt <- filter(data_melt, Year == input$year)
+    }
+    
+    # Filter data based on selected Country
+    if (input$project != "All") {
+      data_melt <- filter(data_melt, Project == input$project)
+    }
+    
+    # Error message for when user has filtered out all data
+    validate (
+      need(nrow(data_melt) > 0, "No data found. Please make another selection.")
+    )
+    
+    # Get top 20 brands
+    specimens <- group_by(data_melt, variable) %>% 
+      summarise(sumValue = sum(value)) %>% 
+      arrange(desc(sumValue))
+    
+    # Bar chart
+    ggplot(specimens, aes(reorder(variable, sumValue))) +
+      geom_bar(aes(weight = sumValue), fill = "#FF6666") + 
+      coord_flip() +
+      ggtitle("Specimen Type") +
+      xlab("Specimen") +
+      ylab("sum value") +
+      theme_bw(base_size = 16)
+    
+  })
+
+ 
+  # Create data table
+  output$table <- renderDataTable({
+    
+    # Filter data based on selected Style
+    if (input$year != "All") {
+      data <- filter(data, Year == input$year)
+    }
+    
+    # Filter data based on selected Country
+    if (input$project != "All") {
+      data <- filter(data, Project == input$project)
+    }
+    
+    # Hide table when user has filtered out all data
+    validate (
+      need(nrow(data) > 0, "")
+    )
+    
+    data[,2:9]
+    
+  })
+  
+  #update select output
+  observe({ updateSelectInput(session,
+                              inputId = "project",
+                              choices = unique(data_melt
+                                               [data_melt$Year == input$year,"Project"]))
+  })
+   
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+```
+
+
+Tendency
+========================================
+```{r}
+
+```
+
+
+Blank
+=========================================
+
+```{r}
+
+```
+
+Blank {data-orientation=columns} 
+===========================================
+
+Column 
+-----------------------------------
+
+### Block
+
+```{r}
+
+```
+
+### Block
+```{r}
+
+```
+
+### Block
+
+```{r}
+
+```
+
+Column
+---------------------------
+
+Report
+
+
+About Report
+========================================
+
+Credit by: 
+
+Confidential: Normal
+
+
+
+
