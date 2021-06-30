@@ -53,4 +53,7 @@ Note: The website takes a long time to load.
 * Run time analysis
 * Create value box in app.R
 
+### Example of user interface
+[![sPbcx9.png](https://sv1.picz.in.th/images/2021/07/01/sPbcx9.png)](https://www.picz.in.th/image/sPbcx9)
+
 Note: The update date of this file is 1/7/2021
