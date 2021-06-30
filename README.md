@@ -54,6 +54,6 @@ Note: The website takes a long time to load.
 * Create value box in app.R
 
 ### Example of user interface
-[![sPbcx9.png](https://sv1.picz.in.th/images/2021/07/01/sPbcx9.png)](https://www.picz.in.th/image/sPbcx9)
+[![sPl4IS.jpg](https://sv1.picz.in.th/images/2021/07/01/sPl4IS.jpg)](https://www.picz.in.th/image/sPl4IS)
 
 Note: The update date of this file is 1/7/2021
