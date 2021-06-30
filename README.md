@@ -19,6 +19,13 @@ Or click on file and then click on `Knit Document`.
 => If you want to open a dashboard created from shiny only,
 You need to open the app.R file by clicking `run app`.
 
+### How to download file in Dropbox to R program?
+To force a R program to download the contents of a Dropbox link, you can use dl=1 as a query parameter in your URL. For example:
+The original shared link : `https://www.dropbox.com/s/a1b2c3d4ef5gh6/example.docx?dl=0`
+Modify links that can be downloaded :` https://www.dropbox.com/s/a1b2c3d4ef5gh6/example.docx?dl=1`
+
+You can download files from dropbox to R program by using read.csv("
+
 ### shinyapp.IO 
 
 I tried deploying Dashboards.R file, you can check it out at...https://thanrada.shinyapps.io/Dashboards/?_ga=2.39631520.229271646.1625041166-1597395094.1623831708
