@@ -1,0 +1,204 @@
+library(shiny)
+library(dplyr)
+library(shinydashboard)
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(tidyr)
+library(data.table)
+library(tidyverse)
+library(plotly)
+library(highcharter)
+library(epicalc)
+
+dataset <- read.csv("dataset.csv",header = TRUE)
+
+specimen_type <- dataset %>% group_by(Specimen_Type) %>% tally() #dataset %>% count(Specimen_Type)
+
+specimen_status <- dataset %>% count(Specimen_Pathological.Status)
+
+data_melt <- read.csv("df_melt.csv", header = TRUE)
+
+
+gender_df <- dataset[!duplicated(dataset[, c("Participant_PPID", "Participant_Gender")]), ]
+dataset$Year.f <- factor(dataset$Year)
+
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("Overall Visualization", tabName = "overall", icon = icon("globe")),
+    menuItem("Query", icon = icon("search-plus"), tabName = "query")
+  )
+)
+
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName = "overall",
+            h2("Dashboard tab content")
+    ),
+    
+    tabItem(tabName = "query",
+            h2("Widgets tab content")
+    )
+  )
+)
+
+
+ui <- dashboardPage(
+  dashboardHeader(title =  "BioBank Dashboard"),
+  sidebar,
+  dashboardBody(
+    tabItems(
+    tabItem(tabName = "overall",
+  fluidRow(
+    infoBoxOutput("plasma_box"),
+    infoBoxOutput("buffy_box")),
+  fluidRow(
+    infoBoxOutput("tissue_box"),
+    infoBoxOutput("serum_box")),
+  fluidRow(
+    column(4,
+           h5(strong("Pie chart from Specimen_Type")),
+           plotlyOutput("Pie_specimen")),
+    column(4,
+           h5(strong("Piecharts of gender")),
+           plotlyOutput("Pie_gender")),
+    column(4,
+           h5(strong("Pie chart from Specimen_Pathological.Status")),
+           plotlyOutput("Pie_status")),
+    column(6,
+           h5(strong("line graph specimen type in each year")),
+           plotlyOutput("Line_specimenType"))
+  )),
+  tabItem(tabName = "query",
+          selectInput(inputId="year", label = "Select Year:", choices = unique(dataset$Year)),
+          selectInput(inputId="project", label = "Select Project:", choices = unique(dataset$Project) %>% sort()),
+          h5(strong("Bar chart of specimen type")),
+          highchartOutput("Bar_specimen"),
+          h5(strong("Pie chart of gender")),
+          plotOutput("Pie_gender2"))
+          )))
+
+
+
+server<-function(input,output, session) { 
+  
+  output$plasma_box <- renderInfoBox({
+    infoBox(
+      title =  paste(specimen_type$Specimen_Type[3],":",sep = ""), value = paste(specimen_type$n[3])
+      , icon = icon("flask", lib = "font-awesome"),
+      color = "yellow", fill = TRUE)
+  })
+  
+  
+  output$buffy_box <- renderInfoBox({
+    infoBox(
+      title =  paste(specimen_type$Specimen_Type[1],":",sep = ""), value = paste(specimen_type$n[1])
+      , icon = icon("virus", lib = "font-awesome"),
+      color = "blue", fill = TRUE)
+  })
+  
+  output$tissue_box <- renderInfoBox({
+    infoBox(
+      title =  paste(specimen_type$Specimen_Type[2],":",sep = ""), value = paste(specimen_type$n[2])
+      , icon = icon("bacon", lib = "font-awesome"),
+      color = "green", fill = TRUE)
+  })
+  
+  output$serum_box <- renderInfoBox({
+    infoBox(
+      title =  paste(specimen_type$Specimen_Type[4],":",sep = ""), value = paste(specimen_type$n[4])
+      , icon = icon("tint", lib = "font-awesome"),
+      color = "red", fill = TRUE)
+  })
+
+  output$Pie_specimen <- renderPlotly({
+    p2 <- plot_ly(data= specimen_type, labels = ~Specimen_Type,values = ~n, type = "pie")
+  })
+  
+  
+  # Pie chart from gender------------------------------------------------
+  output$Pie_gender <- renderPlotly( {
+    dataset %>%
+      group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
+      plot_ly(labels = ~Participant_Gender, type = "pie")
+  })
+  
+  
+  # Pie chart from Specimen_Pathological.Status--------------------------------
+  output$Pie_status <- renderPlotly({
+    dataset %>%
+      group_by(Specimen_Pathological.Status) %>% tally() %>%
+      plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie")
+  })
+  
+  #line graph specimen type in each year----------------------------------------
+  output$Line_specimenType <- renderPlotly({
+    ggplot(dataset, aes(x=Year, color = Specimen_Type)) +
+  geom_line(stat = "count") + theme_minimal()
+  })
+  
+  #Highchart bar chart of specimen type query by year and project----------------
+  output$Bar_specimen <- renderHighchart( {
+    
+    # Filter data based on selected Style
+    if (input$year != "All") {
+      data_melt <- filter(data_melt, Year == input$year)
+    }
+    
+    # Filter data based on selected Country
+    if (input$project != "All") {
+      data_melt <- filter(data_melt, Project == input$project)
+    }
+    
+    # Error message for when user has filtered out all data
+    validate (
+      need(nrow(data_melt) > 0, "No data found. Please make another selection.")
+    )
+    
+    # Get top 20 brands
+    specimens <- group_by(data_melt, variable) %>% 
+      summarise(sumValue = sum(value)) %>% 
+      arrange(desc(sumValue))
+    
+    # Bar chart
+    specimens %>% hchart('column', hcaes(x = variable, y = sumValue, color = variable))
+    
+  })
+  
+  #Highchart bar pie of gender query by year and project--------------------------
+  output$Pie_gender2 <- renderPlot( {
+    
+    # Filter data based on selected Style
+    if (input$year != "All") {
+      gender_df <- filter(gender_df, Year == input$year)
+    }
+    
+    # Filter data based on selected Country
+    if (input$project != "All") {
+      gender_df <- filter(gender_df, Project == input$project)
+    }
+    
+    # Error message for when user has filtered out all data
+    validate (
+      need(nrow(gender_df) > 0, "No data found. Please make another selection.")
+    )
+    
+    # Get sum of each gender
+    gend <- as.data.frame(table(gender_df$Participant_Gender))
+    gend <- gend %>% mutate(per=Freq/sum(Freq)) %>% arrange(desc(Var1))
+    gend$label <- scales::percent(gend$per)
+    
+    #plot Pie chart
+    ggplot(data =gend)+geom_bar(aes(x='',y=per,fill=Var1), stat='identity', width = 1)+coord_polar("y",start=0)+ theme_void()+geom_text(aes(x=1,y=cumsum(per)- per/2,label=label))+ggtitle("Gender Pie chart")
+    #ggplot(gend, aes(x="", y=Freq, fill=Var1)) +
+    # geom_bar(stat="identity", width=1) +
+    #coord_polar("y", start=0)
+    
+  })
+  
+  
+}
+
+shinyApp(ui=ui,server=server)
+  
