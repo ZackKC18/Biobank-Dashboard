@@ -40,20 +40,20 @@ So now you can download files from dropbox to R program by using
 
 ### shinyapp.IO 
 
-I tried deploying Dashboards.R file, you can check it out at...https://thanrada.shinyapps.io/Dashboards/?_ga=2.39631520.229271646.1625041166-1597395094.1623831708
+I tried deploying Dashboards.R file, you can check it out at...https://thanrada.shinyapps.io/Flexdashboard_week5/?_ga=2.154980671.66138176.1625641835-1597395094.1623831708
 Note: The website takes a long time to load.
 
 ### Additional tasks in progress
 * Edit label of visualization
 * Decorate the colors into the same palette.
 * Fix the layout to be appropriate.
-* Add search pages by year only.
-* Add search page by project only
-* Remove Jitterplot
-* Run time analysis
-* Create value box in app.R
+* Add search pages by year only in app.R.
+* Add search page by project only in app.R
+* Modify value box in app.R
+* Add page for data preparation
 
 ### Example of user interface
 [![sPl4IS.jpg](https://sv1.picz.in.th/images/2021/07/01/sPl4IS.jpg)](https://www.picz.in.th/image/sPl4IS)
 
-Note: The update date of this file is 1/7/2021
+Note: The update date of this file is 7/7/2021 -> app.R and Dashboards.Rmd
+
