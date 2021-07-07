@@ -51,6 +51,7 @@ Note: The website takes a long time to load.
 * Add search page by project only in app.R
 * Modify value box in app.R
 * Add page for data preparation
+* Create graph from ggplot then use ggplotly()
 
 ### Example of user interface
 [![sPl4IS.jpg](https://sv1.picz.in.th/images/2021/07/01/sPl4IS.jpg)](https://www.picz.in.th/image/sPl4IS)
