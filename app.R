@@ -10,6 +10,29 @@ library(tidyverse)
 library(plotly)
 library(highcharter)
 
+valueBox <- function(value, subtitle, icon, color) {
+  div(class = "col-lg-3 col-md-6",
+      div(class = "panel panel-primary",
+          div(class = "panel-heading", style = paste0("background-color:", color),
+              div(class = "row",
+                  div(class = "col-xs-3",
+                      icon(icon, "fa-5x")
+                  ),
+                  div(class = ("col-xs-9 text-right"),
+                      div(style = ("font-size: 56px; font-weight: bold;"),
+                          textOutput(value)
+                      ),
+                      div(subtitle)
+                  )
+              )
+          ),
+          div(class = "panel-footer",
+              div(class = "clearfix")
+          )
+      )
+  )
+}
+
 dataset <- read.csv("dataset.csv",header = TRUE)
 
 specimen_type <- dataset %>% group_by(Specimen_Type) %>% tally() #dataset %>% count(Specimen_Type)
@@ -23,22 +46,18 @@ gender_df <- dataset[!duplicated(dataset[, c("Participant_PPID", "Participant_Ge
 dataset$Year.f <- factor(dataset$Year)
 
 
-
 ui<-navbarPage(span("Biobank Dashboard", style = "color: #0176a5 "),
                tabPanel("Overall visualization",
                         fluidRow(
-                          column(2,
-                                 valueBoxOutput("project_box")),
-                          column(2,
-                                 valueBoxOutput("patient_box")),
-                          column(2,
-                                 valueBoxOutput("plasma_box")),
-                          column(2,
-                                 valueBoxOutput("serum_box")),
-                          column(2,
-                                 valueBoxOutput("buffyCoat_box")),
-                          column(2,
-                                 valueBoxOutput("freshTissue_box")),
+                          valueBox(value ="projectBox" , subtitle = "Total Project", icon= "list-alt" ,color = "red"),
+                          valueBox(value ="patientBox" , subtitle = "Total Patients", icon = "user-friends",color = "olive"),
+                          valueBox(value ="plasmaBox" , subtitle = "Total Plasma", icon = "tint",color = "aqua"),
+                          valueBox(value ="serumBox" , subtitle = "Total Serum", icon = "vial",color = "teal"),
+                          valueBox(value ="buffyCoatBox" , subtitle = "Total Buffy coat", icon = "vials",color = "fuchsia"),
+                          valueBox(value ="freshTissueBox" , subtitle = "Total Fresh tissue", icon ="disease",color = "maroon"),
+                          ),
+                        fluidRow(
+    
                           column(4,
                                  h5(strong("Pie chart from Specimen_Type")),
                                  plotlyOutput("Pie_specimen")),
@@ -49,103 +68,80 @@ ui<-navbarPage(span("Biobank Dashboard", style = "color: #0176a5 "),
                                  h5(strong("Pie chart from Specimen_Pathological.Status")),
                                  plotlyOutput("Pie_status")),
                           column(6,
-                                 h5(strong("Project in each years")),
-                                 plotlyOutput("Bar_Project")),
+                                 h5(strong("Bar plot specimen type in each project")),
+                                 highchartOutput("Bar_Project")),
                           column(6,
                                  h5(strong("line graph specimen type in each year")),
                                  plotlyOutput("Line_specimenType"))
                         )
                         
-                        ),
+               ),
                tabPanel("Query",
                         sidebarLayout(sidebarPanel(
                           selectInput(inputId="year", label = "Select Year:", choices = unique(dataset$Year)),
                           selectInput(inputId="project", label = "Select Project:", choices = unique(dataset$Project) %>% sort())),
                           
-
-                      
+                          
+                          
                           #uiOutput(("my_inputProject")),
                           mainPanel(h5(strong("Bar chart of specimen type")),
-                                              highchartOutput("Bar_specimen"),
-                                              
-                                              h5(strong("Pie chart of gender")),
-                                              plotOutput("Pie_gender2")))
+                                    highchartOutput("Bar_specimen"),
+                                    
+                                    h5(strong("Pie chart of gender")),
+                                    plotOutput("Pie_gender2")))
                         
                         
                         
-                        ),
+               ),
                
-               tabPanel("Tendency"
-                       ),
-                        
-                        
-                        
-
                tabPanel("Summary Table",
-            
-                          mainPanel(h5(strong("Table Query")),
-                                    dataTableOutput("table_query")))
-               )
+                        
+                        mainPanel(h5(strong("Table Query")),
+                                  dataTableOutput("table_query")))
+)
 
 
 server<-function(input,output, session) { 
   
-
+  
   #value box ----------------------------------------------------------
-
   
-  output$project_box <- renderValueBox({
+  output$projectBox<- renderText({ 
     Total_Project <- length(unique(dataset$Project))
-    valueBox(value = Total_Project, 
-             #subtitle = "Project" ,
-             icon = icon("arrow-up"),
-             color = "red")
+    print(Total_Project)
   })
-  output$patient_box <- renderValueBox({
-    Total_Patients <-length(unique(dataset$Participant_PPID))
-    valueBox(value = Total_Patients, 
-             #subtitle = 'Total Patients',
-             icon = icon("fa-tasks"),
-             color = "red",
-             href = NULL)
-  })
-  output$plasma_box <- renderValueBox({
-    Total_plasma <- specimen_type[specimen_type$Specimen_Type == 'Plasma' , 'n']
-    valueBox(value = Total_plasma, 
-             #subtitle = "Total plasma" ,
-             icon = icon("arrow-down"),
-             color = "red")
-  })
-  output$serum_box <- renderValueBox({
-    Total_Serum <- specimen_type[specimen_type$Specimen_Type == 'Serum', 'n']
-    valueBox(value = Total_Serum,
-             #subtitle = "Total Serum" ,
-             icon = icon("arrow-down"),
-             color = "red")
-  })
-  output$buffyCoat_box <- renderValueBox({
-    Total_Buffy_Coat <- specimen_type[specimen_type$Specimen_Type == 'Buffy_Coat', 'n']
-    valueBox(value = Total_Buffy_Coat,
-             #subtitle = "Total Buffy Coat" ,
-             icon = icon("arrow-down"),
-             color = "red")
-  })
-  output$freshTissue_box <- renderValueBox({
-    Total_Fresh_Tissue <- specimen_type[specimen_type$Specimen_Type == 'Fresh_Tissue' , 'n']
-    valueBox(value = Total_Fresh_Tissue,
-             #subtitle = "Total Fresh Tissue" ,
-             icon = icon("arrow-down"),
-             color = "red")
-  })
-
   
+  output$patientBox<- renderText({ 
+    Total_Patients <-length(unique(dataset$Participant_PPID))
+    print(Total_Patients)
+  })
+  
+  output$plasmaBox<- renderText({ 
+    Total_plasma <- specimen_type$n[specimen_type$Specimen_Type=='Plasma']
+    print(Total_plasma)
+  })
+  
+  output$serumBox<- renderText({ 
+    Total_Serum <- specimen_type$n[specimen_type$Specimen_Type=='Serum']
+    print(Total_Serum)
+  })
+  
+  output$buffyCoatBox<- renderText({ 
+    Total_Buffy_Coat <- specimen_type$n[specimen_type$Specimen_Type=='Buffy_Coat']
+    print(Total_Buffy_Coat)
+  })
+  
+  output$freshTissueBox<- renderText({ 
+    Total_Buffy_Coat <- specimen_type$n[specimen_type$Specimen_Type=='Fresh_Tissue']
+    print(Total_Fresh_Tissue)
+  })
   
   
   
   
   # Pie chart from Specimen_Type------------------------------------------
   output$Pie_specimen <- renderPlotly({
-      p2 <- plot_ly(data= specimen_type, labels = ~Specimen_Type,values = ~n, type = "pie")
+    p2 <- plot_ly(data= specimen_type, labels = ~Specimen_Type,values = ~n, type = "pie")
   })
   
   
@@ -164,12 +160,6 @@ server<-function(input,output, session) {
       plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie")
   })
   
-  # Project in each years-----------------------------------------------------
-  output$Bar_Project <- renderPlotly({
-    p <- ggplot(dataset, aes(x = Year.f, y = Project, color = Specimen_Type)) +
-      geom_jitter(width = 0.3, height = 0.4, alpha = 0.5) + ylab("Years")
-    ggplotly(p)
-  })
   
   #line graph specimen type in each year----------------------------------------
   output$Line_specimenType <- renderPlotly({
@@ -178,7 +168,13 @@ server<-function(input,output, session) {
       plot_ly(x = ~Year.f, y = ~n, color = ~Specimen_Type, type = "scatter", mode = "lines+markers")
   })
   
-  
+  #Bar chart specimen type in each project-------------------------------------
+  output$Bar_Project <- renderHighchart({
+    dataset %>% count(Project,Specimen_Type) %>%
+      dplyr::rename(sum_value = n) %>%
+      hchart('column', hcaes(x = Project, y = sum_value, group = Specimen_Type), dataLabels = list(
+        enabled = TRUE)) %>% hc_colors(c("#FC9D96", "#FCD096", "#B5D4FC", "#A2E2A6"))
+  }) 
   
   
   #Highchart bar chart of specimen type query by year and project----------------
@@ -211,7 +207,7 @@ server<-function(input,output, session) {
   
   #Highchart bar pie of gender query by year and project--------------------------
   output$Pie_gender2 <- renderPlot( {
-
+    
     # Filter data based on selected Style
     if (input$year != "All") {
       gender_df <- filter(gender_df, Year == input$year)
@@ -237,7 +233,7 @@ server<-function(input,output, session) {
     #ggplot(gend, aes(x="", y=Freq, fill=Var1)) +
     # geom_bar(stat="identity", width=1) +
     #coord_polar("y", start=0)
-
+    
   })
   
   
@@ -256,7 +252,7 @@ server<-function(input,output, session) {
             GROUP BY Year,Project
             ");
   output$table_query <- renderDataTable({
-
+    
     df[,]
   })
   
