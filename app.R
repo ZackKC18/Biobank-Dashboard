@@ -124,6 +124,7 @@ ui <- dashboardPage(
 
 
 server<-function(input,output, session) { 
+  
   sub_dataset <- reactive({
     # Filter data based on selected year
     if (input$year == "Select All") {
@@ -141,6 +142,7 @@ server<-function(input,output, session) {
     if (input$project != "Select All") {
       dataset <- filter(dataset, Project == input$project)
     }
+    
     return(dataset)
     
   })
@@ -230,7 +232,7 @@ server<-function(input,output, session) {
   })
 
   output$Pie_specimen <- renderPlotly({
-    p2 <- plot_ly(data= specimen_type, labels = ~Specimen_Type,values = ~n, type = "pie")
+    plot_ly(data= specimen_type, labels = ~Specimen_Type,values = ~n, type = "pie")
   })
   
   
@@ -273,7 +275,6 @@ server<-function(input,output, session) {
       need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
     )
     
-    
     specimens <- sub_dataset() %>% group_by(Specimen_Type) %>% tally()
     
     # Bar chart
@@ -284,30 +285,21 @@ server<-function(input,output, session) {
   
   #Highchart bar pie of gender query by year and project--------------------------
   output$Pie_gender2 <- renderPlotly( {
-
-      gender_df <- sub_dataset()[!duplicated(sub_dataset()[, c("Participant_PPID", "Participant_Gender")]), ]
-      
+ 
       # Error message for when user has filtered out all data
       validate (
         need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
       )
-      
-      # Get sum of each gender
-      gend <- as.data.frame(table(gender_df$Participant_Gender))
-      gend <- gend %>% mutate(per=Freq/sum(Freq)) %>% arrange(desc(Var1))
-      gend$label <- scales::percent(gend$per)
       
       #plot Pie chart
 
         sub_dataset() %>%
           group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
           plot_ly(labels = ~Participant_Gender, type = "pie")
-
-      #ggplotly(ggplot(data =gend)+geom_bar(aes(x='',y=per,fill=Var1), stat='identity', width = 1)+coord_polar("y",start=0)+ theme_void()+geom_text(aes(x=1,y=cumsum(per)- per/2,label=label))+ggtitle("Gender Pie chart"))
     })
   
-  # show summary table of query page2
   
+  # show summary table of query page2
   output$table_page2 <-renderDataTable({
     
     # Filter data based on selected Style
