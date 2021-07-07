@@ -7,6 +7,7 @@ This repository consist of:
 * dataset.csv - The cleaned file is complete and ready to use.
 * Dashboards.Rmd - The file that the dashboard is generated from. flexdashboard framework and runtime with shiny.
 * app.R - Shiny web app file
+* Percent_Export.R -This is a file for calculating the percentage of samples that are removed each year.
 
 ### Required packages
 * library(shiny)
