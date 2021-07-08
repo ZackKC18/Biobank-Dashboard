@@ -58,5 +58,5 @@ Note: The website takes a long time to load.
 ### Example of user interface
 [![sPl4IS.jpg](https://sv1.picz.in.th/images/2021/07/01/sPl4IS.jpg)](https://www.picz.in.th/image/sPl4IS)
 
-Note: The update date of this file is 7/7/2021 -> app.R and Dashboards.Rmd
+Note: The update date of this file is 8/7/2021 -> app.R and Dashboards.Rmd and clean_app.R
 
