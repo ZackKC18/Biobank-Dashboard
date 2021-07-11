@@ -16,6 +16,11 @@ library(officer)
 library(rvg)
 
 options(shiny.maxRequestSize=30*1024^2) #increase server to 30 MB
+
+#choices of user input
+C_year <- c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020)
+C_specimen <- c('Plasma','Serum','Buffy_Coat','Fresh_Tissue')
+
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Import data", tabName = "import", icon = icon("file-import")),
@@ -46,14 +51,13 @@ body <- dashboardBody(
 
 
 ui <- dashboardPage(
-  dashboardHeader(title =  "BioBank Dashboard"),
+  dashboardHeader(title = "BioBank Dashboard"),
   sidebar,
   dashboardBody(
     tabItems(
     tabItem(tabName = "import",
   fluidRow(
-    fileInput('my_file',label="Upload CSV. here",
-              multiple = TRUE),
+    fileInput('my_file',label="Upload CSV. here", multiple = TRUE),
     tableOutput("preview"),
     downloadButton("download", "Download your report")
   )),
@@ -84,8 +88,8 @@ ui <- dashboardPage(
   )),
   tabItem(tabName = "query",
         fluidRow(
-          selectInput(inputId="year", label = "Select Year:", choices = c(unique(dataset$Year),"Select All")),
-          selectInput(inputId="project", label = "Select Project:", choices = unique(dataset$Project) %>% sort()),
+          selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"Select All")),
+          selectInput(inputId="project", label = "Select Project:", choices = C_specimen %>% sort()),
           infoBoxOutput("project_box2"),
           infoBoxOutput("patient_box2"),
           infoBoxOutput("plasma_box2"),
@@ -121,7 +125,7 @@ server<-function(input,output, session) {
                         use.names = TRUE, fill = TRUE)
     
     colnames(my_file)<- c("Participant_PPID","Participant_Registration.Date","Participant_Gender" ,"Visit_Clinical.Diagnosis..Deprecated.","Visit_Name" ,"Specimen_Type" ,"Specimen_Anatomic.Site","Specimen_Collection.Date","Specimen_Barcode" ,"Specimen_Class" ,"Specimen_Pathological.Status" ,"Specimen_Container.Name","Specimen_Container.Position","Project" )
-    #rename.values(data,'Buffy Coat'='Buffy_Coat') because SQL is sensitive
+    #rename values(ex.'Buffy Coat'='Buffy_Coat') because SQL is sensitive
     my_file$Specimen_Type <- as.character(my_file$Specimen_Type)
     my_file[my_file == "Buffy Coat"] <- "Buffy_Coat"
     my_file[my_file == "Fresh Tissue"] <- "Fresh_Tissue"
