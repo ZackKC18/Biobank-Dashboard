@@ -3,12 +3,10 @@ library(dplyr)
 library(shinydashboard)
 library(gridExtra)
 library(grid)
-library(ggplot2)
 library(tidyr)
 library(data.table)
 library(tidyverse)
 library(plotly)
-library(highcharter)
 library(epicalc)
 library(sqldf)
 library(reshape)
@@ -16,10 +14,6 @@ library(officer)
 library(rvg)
 
 options(shiny.maxRequestSize=30*1024^2) #increase server to 30 MB
-
-#choices of user input
-C_year <- c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020)
-C_specimen <- c('Plasma','Serum','Buffy_Coat','Fresh_Tissue')
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
@@ -51,14 +45,20 @@ body <- dashboardBody(
 
 
 ui <- dashboardPage(
+  
   dashboardHeader(title = "BioBank Dashboard"),
   sidebar,
   dashboardBody(
     tabItems(
     tabItem(tabName = "import",
   fluidRow(
-    fileInput('my_file',label="Upload CSV. here", multiple = TRUE),
-    tableOutput("preview"),
+    span("Please upload file before navigate to the other pages",style="color:red"),
+    column(12,align="center", fileInput('my_file',label="Upload CSV. here", multiple = TRUE)),
+    column(12,align="center", textOutput("descrip")),
+    h4(strong("The data table you uploaded :")),
+    tableOutput("before_cleaned"),
+    h4(strong("Cleaned data table :")),
+    tableOutput("after_cleaned"),
     downloadButton("download", "Download your report")
   )),
     tabItem(tabName = "overall",
@@ -84,12 +84,12 @@ ui <- dashboardPage(
            plotlyOutput("Line_specimenType")),
     column(6,
            h5(strong("Bar graph specimen type in each project")),
-           highchartOutput("Bar_specimenType"))
+           plotlyOutput ("Bar_specimenType"))
   )),
   tabItem(tabName = "query",
         fluidRow(
-          selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"Select All")),
-          selectInput(inputId="project", label = "Select Project:", choices = C_specimen %>% sort()),
+          uiOutput("C_years"),
+          uiOutput("C_projects"),
           infoBoxOutput("project_box2"),
           infoBoxOutput("patient_box2"),
           infoBoxOutput("plasma_box2"),
@@ -100,7 +100,7 @@ ui <- dashboardPage(
         fluidRow(
           column(6,
                  h5(strong("Bar chart of specimen type")),
-                 highchartOutput("Bar_specimen")),
+                 plotlyOutput("Bar_specimen")),
           column(6,
                  h5(strong("Pie chart of gender")),
                  plotlyOutput("Pie_gender2")),
@@ -117,18 +117,22 @@ ui <- dashboardPage(
 
 
 server<-function(input,output, session) { 
+  raw_combine <- reactive({
+    rbindlist(lapply(input$my_file$datapath, fread ),
+                         use.names = TRUE, fill = TRUE)
+  })
   
   my_file <- reactive({
     if (is.null(input$my_file))
       return(NULL)
-    my_file <- rbindlist(lapply(input$my_file$datapath, fread ),
-                        use.names = TRUE, fill = TRUE)
-    
-    colnames(my_file)<- c("Participant_PPID","Participant_Registration.Date","Participant_Gender" ,"Visit_Clinical.Diagnosis..Deprecated.","Visit_Name" ,"Specimen_Type" ,"Specimen_Anatomic.Site","Specimen_Collection.Date","Specimen_Barcode" ,"Specimen_Class" ,"Specimen_Pathological.Status" ,"Specimen_Container.Name","Specimen_Container.Position","Project" )
+    my_file <- raw_combine()
+
+    colnames(my_file) <- c("Participant_PPID","Participant_Registration.Date","Participant_Gender" ,"Visit_Clinical.Diagnosis..Deprecated.","Visit_Name" ,"Specimen_Type" ,"Specimen_Anatomic.Site","Specimen_Collection.Date","Specimen_Barcode" ,"Specimen_Class" ,"Specimen_Pathological.Status" ,"Specimen_Container.Name","Specimen_Container.Position","Project" )
     #rename values(ex.'Buffy Coat'='Buffy_Coat') because SQL is sensitive
     my_file$Specimen_Type <- as.character(my_file$Specimen_Type)
     my_file[my_file == "Buffy Coat"] <- "Buffy_Coat"
     my_file[my_file == "Fresh Tissue"] <- "Fresh_Tissue"
+    my_file[my_file == "Not Specified"] <- "Plasma_Samples"
     #extract year from datetime
     my_file$Year <- format(as.Date(my_file$Specimen_Collection.Date,format="%d/%m/%Y"),"%Y")
     #select only useful columns
@@ -136,6 +140,16 @@ server<-function(input,output, session) {
     return(my_file)
   })
   
+  output$C_years <- renderUI({
+    C_year <- unique(my_file()$Year)
+    selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"Select All") %>% sort())
+  })
+  
+  output$C_projects <- renderUI({
+    C_project <- unique(my_file()$Project)
+    selectInput(inputId="project", label = "Select Project:", choices = c(C_project,"Select All") %>% sort())
+  })
+
   df <- reactive({
     my_file <- my_file()
     df <- sqldf("SELECT Year,Project,COUNT(*) AS Total_samples,COUNT(DISTINCT Participant_PPID) AS Total_patients,
@@ -145,17 +159,13 @@ server<-function(input,output, session) {
             SUM(CASE WHEN Specimen_Type = 'Fresh_Tissue' THEN 1 ELSE 0 END) as Fresh_Tissue,
             SUM(CASE WHEN [Specimen_Pathological.Status] = 'Non-Malignant' THEN 1 ELSE 0 END) as Normal_Tissue,
             SUM(CASE WHEN [Specimen_Pathological.Status] = 'Malignant' THEN 1 ELSE 0 END) as Diseased_Tissue,
-            SUM(CASE WHEN [Specimen_Pathological.Status] = 'Not Specified' THEN 1 ELSE 0 END) as Not_Specified
+            SUM(CASE WHEN [Specimen_Pathological.Status] = 'Plasma_Samples' THEN 1 ELSE 0 END) as Plasma_Samples
             FROM my_file
             GROUP BY Year,Project
             ");
     return(df)
   })
   
-  
-  output$preview <- renderTable({
-    print(head(my_file()))
-  })
   
   specimen_type <-reactive({
     my_file() %>% group_by(Specimen_Type) %>% tally()
@@ -172,7 +182,7 @@ server<-function(input,output, session) {
     
     # Filter data based on selected project
     if (input$project == "Select All") {
-      my_file <- my_file()
+      my_file <- filter(my_file(), Year == input$year)
     }
     
     if (input$project != "Select All") {
@@ -181,6 +191,19 @@ server<-function(input,output, session) {
     
     return(my_file)
     
+  })
+  
+  output$before_cleaned <-  renderTable({
+    print(head(raw_combine()))
+  })
+  
+  output$after_cleaned <- renderTable({
+    print(head(my_file()))
+  })
+  
+  output$descrip <- renderText({
+    paste0("The functionality of this page will help prepare the uploaded data in the proper format.")
+    paste0("You have now uploaded the data : ",dim(raw_combine())[2],"  Columns  ", dim(raw_combine())[1],"  Rows" )
   })
   
   output$project_box <- renderInfoBox({
@@ -268,7 +291,9 @@ server<-function(input,output, session) {
   })
 
   output$Pie_specimen <- renderPlotly({
-    plot_ly(data= specimen_type(), labels = ~specimen_type,values = ~n, type = "pie")
+    my_file() %>%
+      count(Specimen_Type) %>%
+      plot_ly(labels = ~Specimen_Type, values= ~n , type='pie'                      )
   })
   
   
@@ -287,24 +312,26 @@ server<-function(input,output, session) {
       plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie")
   })
   
-  #line graph specimen type in each year----------------------------------------
+  #line graph specimen type in each year
   output$Line_specimenType <- renderPlotly({
-    ggplot(my_file(), aes(x=Year, color = Specimen_Type)) +
-  geom_line(stat = "count") + theme_minimal()
+    my_file() %>% count(Year,Specimen_Type) %>%
+      dplyr::rename(sum_value = n) %>%
+      plot_ly(x=~Year, y=~sum_value,color = ~Specimen_Type, type = "scatter" , mode = "lines+markers",
+              text = ~sum_value, textposition = "outside")
+  
   })
   
-  #barchart each specimen type group by project----------------------------------------
-  output$Bar_specimenType <- renderHighchart({
+  #barchart each specimen type group by project
+  output$Bar_specimenType <- renderPlotly({
     my_file() %>% count(Project,Specimen_Type) %>%
     dplyr::rename(sum_value = n) %>%
-    hchart('column', hcaes(x = Project, y = sum_value, group = Specimen_Type), dataLabels = list(
-      enabled = TRUE)) %>% hc_colors(c("#FC9D96", "#FCD096", "#B5D4FC", "#A2E2A6"))
+    plot_ly(x=~Project,y=~sum_value,color = ~Specimen_Type,type="bar")
   })
   
   
   
-  #Highchart bar chart of specimen type query by year and project----------------
-  output$Bar_specimen <- renderHighchart( {
+  #Highchart bar chart of specimen type query by year and project
+  output$Bar_specimen <- renderPlotly( {
     
     # Error message for when user has filtered out all data
     validate (
@@ -314,12 +341,12 @@ server<-function(input,output, session) {
     specimens <- sub_dataset() %>% group_by(Specimen_Type) %>% tally()
     
     # Bar chart
-    specimens %>% hchart('column', hcaes(x = Specimen_Type, y = n, color = Specimen_Type))
+    plot_ly(specimens, x= ~Specimen_Type ,y=~n , type = 'bar', name = 'Bar chart of specimen type from query year and project')
     
   })
   
   
-  #Highchart bar pie of gender query by year and project--------------------------
+  #Highchart bar pie of gender query by year and project
   output$Pie_gender2 <- renderPlotly( {
  
       # Error message for when user has filtered out all data
