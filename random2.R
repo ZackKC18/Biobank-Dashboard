@@ -1,6 +1,10 @@
+library(plyr)
 library(dplyr)
 library(tidyverse)
 library(tidyr)
+library(sqldf)
+library(lubridate)
+library(Rcpp)
 
 #import data
 BS1001 <- read.csv("C:/data/BS1001data.csv")
@@ -26,10 +30,26 @@ data[data == "Buffy Coat"] <- "Buffy_Coat"
 data[data == "Fresh Tissue"] <- "Fresh_Tissue"
 
 #extract year from datetime
-data$Year <- format(as.Date(data$Specimen_Collection.Date,format="%d/%m/%Y"),"%Y" )
-data <- select(data, Participant_PPID,Specimen_Type,Specimen_Pathological.Status, Specimen_Barcode, Specimen_Container.Name, Specimen_Container.Position, Project,Year,Participant_Gender)
+data$Datetime <- as.Date(data$Specimen_Collection.Date,format="%d/%m/%Y")
+data <- select(data, Participant_PPID,Specimen_Type,Specimen_Pathological.Status, Specimen_Barcode, Specimen_Container.Name, Specimen_Container.Position, Project,
+               Datetime, Participant_Gender)
 
-set.seed(12345)
+# check data type of Datetime
+class(data$Datetime)
 
-randdata <- sample_n(data, 45)
+max_date <- max(data$Datetime) 
+min_date <- min(data$Datetime)
+# date of 6 latest months
+x <- seq(as.Date(max_date), to=as.Date(min_date), by='-6 months')[2]
+# "2019-09-19"
+
+# dataframe 6 latest months
+df <- data[data$Datetime > x &
+             data$Datetime <= max_date, ]
+
+# random ------------------------------------------------------------------------------------------
+
+set.seed(1)
+
+randdata <- sample_n(df, 45)
 randdata
