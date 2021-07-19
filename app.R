@@ -126,13 +126,12 @@ server<-function(input,output, session) {
     if (is.null(input$my_file))
       return(NULL)
     my_file <- raw_combine()
-
     colnames(my_file) <- c("Participant_PPID","Participant_Registration.Date","Participant_Gender" ,"Visit_Clinical.Diagnosis..Deprecated.","Visit_Name" ,"Specimen_Type" ,"Specimen_Anatomic.Site","Specimen_Collection.Date","Specimen_Barcode" ,"Specimen_Class" ,"Specimen_Pathological.Status" ,"Specimen_Container.Name","Specimen_Container.Position","Project" )
     #rename values(ex.'Buffy Coat'='Buffy_Coat') because SQL is sensitive
     my_file$Specimen_Type <- as.character(my_file$Specimen_Type)
     my_file[my_file == "Buffy Coat"] <- "Buffy_Coat"
     my_file[my_file == "Fresh Tissue"] <- "Fresh_Tissue"
-    my_file[my_file == "Not Specified"] <- "Plasma_Samples"
+    my_file[my_file == "Not Specified"] <- "Blood_Samples"
     #extract year from datetime
     my_file$Year <- format(as.Date(my_file$Specimen_Collection.Date,format="%d/%m/%Y"),"%Y")
     #select only useful columns
@@ -142,12 +141,12 @@ server<-function(input,output, session) {
   
   output$C_years <- renderUI({
     C_year <- unique(my_file()$Year)
-    selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"Select All") %>% sort())
+    selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"All Years") %>% sort())
   })
   
   output$C_projects <- renderUI({
     C_project <- unique(my_file()$Project)
-    selectInput(inputId="project", label = "Select Project:", choices = c(C_project,"Select All") %>% sort())
+    selectInput(inputId="project", label = "Select Project:", choices = c(C_project,"All Projects") %>% sort())
   })
 
   df <- reactive({
@@ -159,7 +158,7 @@ server<-function(input,output, session) {
             SUM(CASE WHEN Specimen_Type = 'Fresh_Tissue' THEN 1 ELSE 0 END) as Fresh_Tissue,
             SUM(CASE WHEN [Specimen_Pathological.Status] = 'Non-Malignant' THEN 1 ELSE 0 END) as Normal_Tissue,
             SUM(CASE WHEN [Specimen_Pathological.Status] = 'Malignant' THEN 1 ELSE 0 END) as Diseased_Tissue,
-            SUM(CASE WHEN [Specimen_Pathological.Status] = 'Plasma_Samples' THEN 1 ELSE 0 END) as Plasma_Samples
+            SUM(CASE WHEN [Specimen_Pathological.Status] = 'Blood_Samples' THEN 1 ELSE 0 END) as Blood_Samples
             FROM my_file
             GROUP BY Year,Project
             ");
@@ -173,23 +172,20 @@ server<-function(input,output, session) {
   
   sub_dataset <- reactive({
     # Filter data based on selected year
-    if (input$year == "Select All") {
-      my_file<- my_file()
+    if (input$year == "All Years") {
+      if(input$project == "All Projects"){
+        my_file<- my_file()
+      } else {
+        my_file <- filter(my_file(), Project == input$project)
+      }
+      
+    } else {
+      if(input$project == "All Projects"){
+        my_file<- filter(my_file(), Year == input$year)
+      } else {
+        my_file <- filter(my_file(), Project == input$project & Year == input$year) 
+      }
     }
-    if (input$year != "Select All") {
-      my_file<- filter(my_file(), Year == input$year)
-    }
-    
-    # Filter data based on selected project
-    if (input$project == "Select All") {
-      my_file <- filter(my_file(), Year == input$year)
-    }
-    
-    if (input$project != "Select All") {
-      my_file <- filter(my_file(), Project == input$project)
-    }
-    
-    return(my_file)
     
   })
   
@@ -293,7 +289,7 @@ server<-function(input,output, session) {
   output$Pie_specimen <- renderPlotly({
     my_file() %>%
       count(Specimen_Type) %>%
-      plot_ly(labels = ~Specimen_Type, values= ~n , type='pie'                      )
+      plot_ly(labels = ~Specimen_Type, values= ~n , type='pie' )
   })
   
   
@@ -368,26 +364,22 @@ server<-function(input,output, session) {
     data_melt <-melt((df() %>% dplyr::select(Year,Project,Plasma,Serum,Buffy_Coat,Fresh_Tissue)), id = c("Year","Project"))
     
     # Filter data based on selected Style
-    if (input$year == "Select All") {
+    if (input$year == "All Years") {
       data_melt <- data_melt
-    }
-    
-    if (input$year != "Select All") {
+    } else {
       data_melt <- filter(data_melt, Year == input$year)
     }
     
     # Filter data based on selected Country
-    if (input$project == "Select All") {
+    if (input$project == "All Projects") {
       data_melt <- data_melt
-    }
-    
-    if (input$project != "Select All") {
+    } else {
       data_melt <- filter(data_melt, Project == input$project)
     }
     
     # Hide table when user has filtered out all data
     validate (
-      need(nrow(data_melt) > 0, "")
+      need(nrow(data_melt()) > 0, "No data found. Please make another selection.")
     )
     
     data_melt[,]
@@ -401,12 +393,21 @@ server<-function(input,output, session) {
     df()[,]
   })
   
+  observeEvent(c(input$year, input$project),{
+    
+  }
+               
+               )
+
+  
   #update select output
   observe({ updateSelectInput(session,
                               inputId = "project",
                               choices = c(unique(my_file()
-                                               [my_file()$Year == input$year,"Project"]),"Select All"))
+                                               [my_file()$Year == input$year,"Project"]),"All Projects"))
   })
+  
+
   
   #Download report
   output$download <- downloadHandler(
