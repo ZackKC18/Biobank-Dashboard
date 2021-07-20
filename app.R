@@ -50,76 +50,77 @@ ui <- dashboardPage(
   sidebar,
   dashboardBody(
     tabItems(
-    tabItem(tabName = "import",
-  fluidRow(
-    span("Please upload file before navigate to the other pages",style="color:red"),
-    column(12,align="center", fileInput('my_file',label="Upload CSV. here", multiple = TRUE)),
-    column(12,align="center", textOutput("descrip")),
-    h4(strong("The data table you uploaded :")),
-    tableOutput("before_cleaned"),
-    h4(strong("Cleaned data table :")),
-    tableOutput("after_cleaned"),
-    downloadButton("download", "Download your report")
-  )),
-    tabItem(tabName = "overall",
-  fluidRow(
-    infoBoxOutput("project_box"),
-    infoBoxOutput("patient_box"),
-    infoBoxOutput("plasma_box"),
-    infoBoxOutput("serum_box"),
-    infoBoxOutput("tissue_box"),
-    infoBoxOutput("buffy_box")),
-  fluidRow(
-    column(4,
-           h5(strong("Pie chart from Specimen_Type")),
-           plotlyOutput("Pie_specimen")),
-    column(4,
-           h5(strong("Piecharts of gender")),
-           plotlyOutput("Pie_gender")),
-    column(4,
-           h5(strong("Pie chart from Specimen_Pathological.Status")),
-           plotlyOutput("Pie_status")),
-    column(6,
-           h5(strong("line graph specimen type in each year")),
-           plotlyOutput("Line_specimenType")),
-    column(6,
-           h5(strong("Bar graph specimen type in each project")),
-           plotlyOutput ("Bar_specimenType"))
-  )),
-  tabItem(tabName = "query",
-        fluidRow(
-          uiOutput("C_years"),
-          uiOutput("C_projects"),
-          infoBoxOutput("project_box2"),
-          infoBoxOutput("patient_box2"),
-          infoBoxOutput("plasma_box2"),
-          infoBoxOutput("serum_box2"),
-          infoBoxOutput("tissue_box2"),
-          infoBoxOutput("buffy_box2")
-          ),
-        fluidRow(
-          column(6,
-                 h5(strong("Bar chart of specimen type")),
-                 plotlyOutput("Bar_specimen")),
-          column(6,
-                 h5(strong("Pie chart of gender")),
-                 plotlyOutput("Pie_gender2")),
-          column(6,
-                 h5(strong("Query Table")),
-                 dataTableOutput("table_page2"))
-          )),
-  tabItem(tabName = "table",
-          h5(strong("Table Query")),      
-          dataTableOutput("table_query"))
-  
-  )))  
+      tabItem(tabName = "import",
+              fluidRow(
+                span("Please upload file before navigate to the other pages",style="color:red"),
+                column(12,align="center", fileInput('my_file',label="Upload CSV. here", multiple = TRUE)),
+                column(12,align="center", textOutput("descrip")),
+                h4(strong("The data table you uploaded :")),
+                tableOutput("before_cleaned"),
+                h4(strong("Cleaned data table :")),
+                tableOutput("after_cleaned"),
+                downloadButton("download", "Download your report")
+              )),
+      tabItem(tabName = "overall",
+              fluidRow(
+                infoBoxOutput("project_box"),
+                infoBoxOutput("patient_box"),
+                infoBoxOutput("plasma_box"),
+                infoBoxOutput("serum_box"),
+                infoBoxOutput("tissue_box"),
+                infoBoxOutput("buffy_box")),
+              fluidRow(
+                column(4,
+                       h5(strong("Pie chart from Specimen_Type")),
+                       plotlyOutput("Pie_specimen")),
+                column(4,
+                       h5(strong("Piecharts of gender")),
+                       plotlyOutput("Pie_gender")),
+                column(4,
+                       h5(strong("Pie chart from Specimen_Pathological.Status")),
+                       plotlyOutput("Pie_status")),
+                column(6,
+                       h5(strong("line graph specimen type in each year")),
+                       plotlyOutput("Line_specimenType")),
+                column(6,
+                       h5(strong("Bar graph specimen type in each project")),
+                       plotlyOutput ("Bar_specimenType"))
+              )),
+      tabItem(tabName = "query",
+              fluidRow(
+                uiOutput("C_years"),
+                uiOutput("C_projects"),
+                verbatimTextOutput("test"),
+                infoBoxOutput("project_box2"),
+                infoBoxOutput("patient_box2"),
+                infoBoxOutput("plasma_box2"),
+                infoBoxOutput("serum_box2"),
+                infoBoxOutput("tissue_box2"),
+                infoBoxOutput("buffy_box2")
+              ),
+              fluidRow(
+                column(6,
+                       h5(strong("Bar chart of specimen type")),
+                       plotlyOutput("Bar_specimen")),
+                column(6,
+                       h5(strong("Pie chart of gender")),
+                       plotlyOutput("Pie_gender2")),
+                column(6,
+                       h5(strong("Query Table")),
+                       dataTableOutput("table_page2"))
+              )),
+      tabItem(tabName = "table",
+              h5(strong("Table Query")),      
+              dataTableOutput("table_query"))
+      
+    )))  
 
 
 
 server<-function(input,output, session) { 
   raw_combine <- reactive({
     rbindlist(lapply(input$my_file$datapath, fread ),
-                         use.names = TRUE, fill = TRUE)
+              use.names = TRUE, fill = TRUE)
   })
   
   my_file <- reactive({
@@ -134,21 +135,38 @@ server<-function(input,output, session) {
     my_file[my_file == "Not Specified"] <- "Blood_Samples"
     #extract year from datetime
     my_file$Year <- format(as.Date(my_file$Specimen_Collection.Date,format="%d/%m/%Y"),"%Y")
+    my_file$Year <- factor(my_file$Year)
+    my_file$Project <- factor(my_file$Project)
     #select only useful columns
     my_file <- my_file %>% dplyr::select(Participant_PPID,Specimen_Type,Specimen_Pathological.Status,Project,Year,Participant_Gender)
     return(my_file)
   })
   
   output$C_years <- renderUI({
-    C_year <- unique(my_file()$Year)
+    C_year <- levels(my_file()$Year)
     selectInput(inputId="year", label = "Select Year:", choices = c(C_year,"All Years") %>% sort())
   })
   
-  output$C_projects <- renderUI({
-    C_project <- unique(my_file()$Project)
-    selectInput(inputId="project", label = "Select Project:", choices = c(C_project,"All Projects") %>% sort())
+  output$C_projects  <- renderUI({
+    # All years doesn't work
+    #datproj <- filter(my_file(), Year == input$year)
+    #datproj$Project <- factor(datproj$Project)
+    #selectInput(inputId = "proj", label = "Select Project:",
+    #           choices = c(as.list(levels(datproj$Project)), "All Projects"),multiple = FALSE)
+    
+    if(input$year!="All Years"){
+      datproj <- filter(my_file(), Year == input$year)
+      datproj$Project <- factor(datproj$Project)
+      selectInput(inputId = "proj", label = "Select Project:",
+                  choices = c(as.list(levels(datproj$Project)), "All Projects"),multiple = FALSE)
+      
+    } else {
+      C_proj <- levels(my_file()$Project)
+      selectInput(inputId = "proj", label = "Select Project:",
+                  choices =c(C_proj,"All Projects"), multiple = FALSE)
+    }
   })
-
+  
   df <- reactive({
     my_file <- my_file()
     df <- sqldf("SELECT Year,Project,COUNT(*) AS Total_samples,COUNT(DISTINCT Participant_PPID) AS Total_patients,
@@ -173,17 +191,17 @@ server<-function(input,output, session) {
   sub_dataset <- reactive({
     # Filter data based on selected year
     if (input$year == "All Years") {
-      if(input$project == "All Projects"){
+      if(input$proj == "All Projects"){
         my_file<- my_file()
       } else {
-        my_file <- filter(my_file(), Project == input$project)
+        my_file <- filter(my_file(), Project == input$proj)
       }
       
     } else {
-      if(input$project == "All Projects"){
+      if(input$proj == "All Projects"){
         my_file<- filter(my_file(), Year == input$year)
       } else {
-        my_file <- filter(my_file(), Project == input$project & Year == input$year) 
+        my_file <- filter(my_file(), Project == input$proj & Year == input$year) 
       }
     }
     
@@ -285,7 +303,7 @@ server<-function(input,output, session) {
       , icon = icon("tint", lib = "font-awesome"),
       color = "red", fill = TRUE)
   })
-
+  
   output$Pie_specimen <- renderPlotly({
     my_file() %>%
       count(Specimen_Type) %>%
@@ -314,14 +332,14 @@ server<-function(input,output, session) {
       dplyr::rename(sum_value = n) %>%
       plot_ly(x=~Year, y=~sum_value,color = ~Specimen_Type, type = "scatter" , mode = "lines+markers",
               text = ~sum_value, textposition = "outside")
-  
+    
   })
   
   #barchart each specimen type group by project
   output$Bar_specimenType <- renderPlotly({
     my_file() %>% count(Project,Specimen_Type) %>%
-    dplyr::rename(sum_value = n) %>%
-    plot_ly(x=~Project,y=~sum_value,color = ~Specimen_Type,type="bar")
+      dplyr::rename(sum_value = n) %>%
+      plot_ly(x=~Project,y=~sum_value,color = ~Specimen_Type,type="bar")
   })
   
   
@@ -344,18 +362,18 @@ server<-function(input,output, session) {
   
   #Highchart bar pie of gender query by year and project
   output$Pie_gender2 <- renderPlotly( {
- 
-      # Error message for when user has filtered out all data
-      validate (
-        need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
-      )
-      
-      #plot Pie chart
-
-        sub_dataset() %>%
-          group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
-          plot_ly(labels = ~Participant_Gender, type = "pie")
-    })
+    
+    # Error message for when user has filtered out all data
+    validate (
+      need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
+    )
+    
+    #plot Pie chart
+    
+    sub_dataset() %>%
+      group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
+      plot_ly(labels = ~Participant_Gender, type = "pie")
+  })
   
   
   # show summary table of query page2
@@ -387,7 +405,7 @@ server<-function(input,output, session) {
   })
   
   # Table summary -------------------------------------------------------------
-
+  
   output$table_query <- renderDataTable({
     
     df()[,]
@@ -396,30 +414,29 @@ server<-function(input,output, session) {
   observeEvent(c(input$year, input$project),{
     
   }
-               
-               )
-
+  
+  )
+  
   
   #update select output
   observe({ updateSelectInput(session,
                               inputId = "project",
                               choices = c(unique(my_file()
-                                               [my_file()$Year == input$year,"Project"]),"All Projects"))
+                                                 [my_file()$Year == input$year,"Project"]),"All Projects"))
   })
   
-
+  
   
   #Download report
   output$download <- downloadHandler(
     filename = function(){"Biobank_report.pptx"}, 
-                                     content = function(fname){
-                                       
-                                     }
-                                     
+    content = function(fname){
+      
+    }
+    
   )
   
   
 }
 
 shinyApp(ui=ui,server=server)
-  
