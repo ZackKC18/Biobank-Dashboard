@@ -12,6 +12,8 @@ library(sqldf)
 library(reshape)
 library(officer)
 library(rvg)
+library(flextable)
+library(RColorBrewer)
 
 options(shiny.maxRequestSize=30*1024^2) #increase server to 30 MB
 
@@ -50,7 +52,7 @@ ui <- dashboardPage(
   dashboardHeader(title = "BioBank Dashboard"),
   sidebar,
   dashboardBody(
-  tags$head(tags$style(HTML('
+    tags$head(tags$style(HTML('
     .main-header .logo {
       font-family: "Georgia", Times, "Times New Roman", serif;
       font-weight: bold;
@@ -130,7 +132,7 @@ server<-function(input,output, session) {
     if (is.null(input$my_file))
       return(NULL)
     data.table::rbindlist(lapply(input$my_file$datapath, fread ),
-              use.names = TRUE, fill = TRUE)
+                          use.names = TRUE, fill = TRUE)
   })
   
   my_file <- reactive({
@@ -157,7 +159,7 @@ server<-function(input,output, session) {
   })
   
   output$C_projects  <- renderUI({
-
+    
     if(input$year!="All Years"){
       datproj <- dplyr::filter(my_file(), Year == input$year)
       datproj$Project <- factor(datproj$Project)
@@ -313,11 +315,29 @@ server<-function(input,output, session) {
       color = "red", fill = TRUE)
   })
   
+  
+  # Pie chart from specimen type------------------------------------------------ 
   output$Pie_specimen <- renderPlotly({
     Valid_function()
     my_file() %>%
       count(Specimen_Type) %>%
-      plot_ly(labels = ~Specimen_Type, values= ~n , type='pie' )
+      plot_ly(labels = ~Specimen_Type, values= ~n , type='pie',
+              marker = list(colors = brewer.pal(n = 4, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
+  })
+  
+  # ggplot specimen type
+  type_pie <- reactive({
+    ggplot(my_file(), aes(x = "", fill = factor(Specimen_Type))) +
+      geom_bar(stat="count", width=1, color="white") +
+      geom_text(aes(label = scales::percent(..count.. / sum(..count..))), 
+                stat = "count", position = position_stack(vjust = .5)) +
+      coord_polar("y", start=0) + labs(fill = "Type of Specimen") +
+      theme_void() +
+      scale_fill_brewer(palette="Pastel1")
+  })
+  
+  output$Pie_specimen1 <- renderPlot({
+    type_pie()
   })
   
   
@@ -326,34 +346,87 @@ server<-function(input,output, session) {
     Valid_function()
     my_file() %>%
       group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
-      plot_ly(labels = ~Participant_Gender, type = "pie")
+      plot_ly(labels = ~Participant_Gender, type = "pie", 
+              marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
   
+  # ggplot gender
+  gender_pie <- reactive({
+    ggplot(my_file()[!duplicated(my_file()[, c("Participant_PPID", "Participant_Gender")]), ], 
+           aes(x = factor(1), fill = factor(Participant_Gender))) +
+      geom_bar(stat="count", width=1, color="white") +
+      geom_text(aes(label = scales::percent(..count.. / sum(..count..))), 
+                stat = "count", position = position_stack(vjust = .5)) +
+      coord_polar("y", start=0) + labs(fill = "Specimen Status") +
+      theme_void() +
+      scale_fill_brewer(palette="Pastel1")
+  })
+  
+  output$Pie_gender1 <- renderPlot({
+    gender_pie()
+  })
   
   # Pie chart from Specimen_Pathological.Status--------------------------------
   output$Pie_status <- renderPlotly({
     Valid_function()
     my_file() %>%
       group_by(Specimen_Pathological.Status) %>% tally() %>%
-      plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie")
+      plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie",
+              marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
   
-  #line graph specimen type in each year
-  output$Line_specimenType <- renderPlotly({
-    Valid_function()
-    my_file() %>% count(Year,Specimen_Type) %>%
-      dplyr::rename(sum_value = n) %>%
-      plot_ly(x=~Year, y=~sum_value,color = ~Specimen_Type, type = "scatter" , mode = "lines+markers",
-              text = ~sum_value, textposition = "outside")
+  status_pie <- reactive({
+    ggplot(my_file(), aes(x = factor(1), fill = factor(Specimen_Pathological.Status))) +
+      geom_bar(stat="count", width=1, color="white") +
+      geom_text(aes(label = scales::percent(..count.. / sum(..count..))), 
+                stat = "count", position = position_stack(vjust = .5)) +
+      coord_polar("y", start=0) + labs(fill = "Specimen Status") +
+      theme_void() +
+      scale_fill_brewer(palette="Pastel1")
     
   })
   
-  #barchart each specimen type group by project
-  output$Bar_specimenType <- renderPlotly({
-    Valid_function()
-    my_file() %>% count(Project,Specimen_Type) %>%
+  output$Pie_status1 <- renderPlot({
+    status_pie()
+  })
+  
+  #line graph specimen type in each year
+  line_chart <- reactive({
+    my_file() %>%
+      count(Year, Specimen_Type) %>% 
       dplyr::rename(sum_value = n) %>%
-      plot_ly(x=~Project,y=~sum_value,color = ~Specimen_Type,type="bar")
+      ggplot(aes(x = Year, y = sum_value, group = Specimen_Type)) +
+      geom_line(aes(color=Specimen_Type)) +
+      geom_point(aes(color=Specimen_Type)) +
+      geom_text(aes(label = sum_value), position = position_dodge(width=0.8), hjust=-.25, size=2.5)
+  })
+  
+  output$Line_specimenType <- renderPlotly({
+    ggplotly(line_chart())
+  })
+  
+  output$Line_specimenType1 <- renderPlot({
+    line_chart()
+  })
+  
+  
+  #barchart each specimen type group by project
+  bar_chart <- reactive({
+    my_file() %>% count(Project,Specimen_Type) %>% 
+      dplyr::rename(sum_value = n) %>%
+      ggplot(aes(x = Project, y = sum_value, fill = Specimen_Type)) +
+      geom_bar(width=0.7, position=position_dodge(width=0.75), stat="identity") +
+      geom_text(aes(label = sum_value), position = position_dodge(width=0.9), size=2.5) +
+      scale_y_sqrt() +
+      scale_fill_brewer(palette="Pastel1")
+  })
+  
+  output$Bar_specimenType <- renderPlotly({
+    ggplotly(bar_chart())
+  })
+  
+  output$Bar_specimenType1 <- renderPlot({
+    bar_chart()
   })
   
   
@@ -363,7 +436,8 @@ server<-function(input,output, session) {
     Valid_function()
     #Plot
     specimens <- sub_dataset() %>% group_by(Specimen_Type) %>% tally()
-    plot_ly(specimens, x= ~Specimen_Type ,y=~n , type = 'bar', name = 'Bar chart of specimen type from query year and project')
+    plot_ly(specimens, x= ~Specimen_Type ,y=~n , type = 'bar',
+            color = ~Specimen_Type, colors = brewer.pal(n = 4, name = "Pastel1"))
     
   })
   
@@ -374,7 +448,8 @@ server<-function(input,output, session) {
     #Plot
     sub_dataset() %>%
       group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
-      plot_ly(labels = ~Participant_Gender, type = "pie")
+      plot_ly(labels = ~Participant_Gender, type = "pie",
+              marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
   
   
@@ -427,6 +502,50 @@ server<-function(input,output, session) {
   output$download <- downloadHandler(
     filename = function(){"Biobank_report.pptx"}, 
     content = function(fname){
+      
+      flex_df <- flextable(df()[,]) %>%
+        bg(i = 1, bg = "#CFEAF8", part = "header") %>%
+        font(i = 1, fontname = "Chulabhorn Likit Text", part = "header") %>%
+        font(fontname = "Chulabhorn Likit Text", part = "body") %>%
+        fontsize(i = 1, size = 12, part = "header") %>%
+        fontsize(size = 10, part = "body") %>%
+        align(align = "center", part = "all")
+      
+      text_font <- fp_text(font.family = "Chulabhorn Likit Text", font.size = 32)
+      
+      doc <-
+        read_pptx() %>%
+        add_slide(layout="Title Slide", master="Office Theme") %>%
+        ph_with(value = fpar(ftext("Biobank Report", fp_text(bold = TRUE, font.family = "Chulabhorn Likit Text", font.size = 48))), 
+                location = ph_location_type(type = "ctrTitle")) %>%
+        ph_with(value = fpar(ftext("Data Visualization and Summary Table", text_font)), 
+                location = ph_location_type(type = "subTitle")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Pie chart of specimen type", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = type_pie(), location = ph_location_type(type = "body")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Pie chart of specimen status", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = status_pie(), location = ph_location_type(type = "body")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Pie chart of gender", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = gender_pie(), location = ph_location_type(type = "body")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Specimen type in each year", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = line_chart(), location = ph_location_type(type = "body")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Specimen type in each project", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = bar_chart(), location = ph_location_type(type = "body")) %>%
+        
+        add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with(value = fpar(ftext("Summary table", text_font)), location = ph_location_type(type = "title")) %>%
+        ph_with(value = flex_df, location = ph_location_type(type = "body", position_top = FALSE)) %>%
+        
+        print(doc, target = fname)
       
     }
     
