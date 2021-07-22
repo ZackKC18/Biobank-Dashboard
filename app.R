@@ -1,11 +1,11 @@
 library(shiny)
 library(dplyr)
 library(shinydashboard)
-library(gridExtra)
-library(grid)
-library(tidyr)
+#library(gridExtra)
+#library(grid)
+#library(tidyr)
 library(data.table)
-library(tidyverse)
+#library(tidyverse)
 library(plotly)
 library(epicalc)
 library(sqldf)
@@ -14,6 +14,7 @@ library(officer)
 library(rvg)
 
 options(shiny.maxRequestSize=30*1024^2) #increase server to 30 MB
+
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
@@ -49,6 +50,13 @@ ui <- dashboardPage(
   dashboardHeader(title = "BioBank Dashboard"),
   sidebar,
   dashboardBody(
+  tags$head(tags$style(HTML('
+    .main-header .logo {
+      font-family: "Georgia", Times, "Times New Roman", serif;
+      font-weight: bold;
+      font-size: 24px;
+    }
+  '))),
     tabItems(
       tabItem(tabName = "import",
               fluidRow(
@@ -119,7 +127,9 @@ ui <- dashboardPage(
 
 server<-function(input,output, session) { 
   raw_combine <- reactive({
-    rbindlist(lapply(input$my_file$datapath, fread ),
+    if (is.null(input$my_file))
+      return(NULL)
+    data.table::rbindlist(lapply(input$my_file$datapath, fread ),
               use.names = TRUE, fill = TRUE)
   })
   
@@ -129,7 +139,6 @@ server<-function(input,output, session) {
     my_file <- raw_combine()
     colnames(my_file) <- c("Participant_PPID","Participant_Registration.Date","Participant_Gender" ,"Visit_Clinical.Diagnosis..Deprecated.","Visit_Name" ,"Specimen_Type" ,"Specimen_Anatomic.Site","Specimen_Collection.Date","Specimen_Barcode" ,"Specimen_Class" ,"Specimen_Pathological.Status" ,"Specimen_Container.Name","Specimen_Container.Position","Project" )
     #rename values(ex.'Buffy Coat'='Buffy_Coat') because SQL is sensitive
-    my_file$Specimen_Type <- as.character(my_file$Specimen_Type)
     my_file[my_file == "Buffy Coat"] <- "Buffy_Coat"
     my_file[my_file == "Fresh Tissue"] <- "Fresh_Tissue"
     my_file[my_file == "Not Specified"] <- "Blood_Samples"
@@ -148,14 +157,9 @@ server<-function(input,output, session) {
   })
   
   output$C_projects  <- renderUI({
-    # All years doesn't work
-    #datproj <- filter(my_file(), Year == input$year)
-    #datproj$Project <- factor(datproj$Project)
-    #selectInput(inputId = "proj", label = "Select Project:",
-    #           choices = c(as.list(levels(datproj$Project)), "All Projects"),multiple = FALSE)
-    
+
     if(input$year!="All Years"){
-      datproj <- filter(my_file(), Year == input$year)
+      datproj <- dplyr::filter(my_file(), Year == input$year)
       datproj$Project <- factor(datproj$Project)
       selectInput(inputId = "proj", label = "Select Project:",
                   choices = c(as.list(levels(datproj$Project)), "All Projects"),multiple = FALSE)
@@ -168,8 +172,9 @@ server<-function(input,output, session) {
   })
   
   df <- reactive({
+    req(my_file())
     my_file <- my_file()
-    df <- sqldf("SELECT Year,Project,COUNT(*) AS Total_samples,COUNT(DISTINCT Participant_PPID) AS Total_patients,
+    df <- sqldf::sqldf("SELECT Year,Project,COUNT(*) AS Total_samples,COUNT(DISTINCT Participant_PPID) AS Total_patients,
             SUM(CASE WHEN Specimen_Type = 'Plasma' THEN 1 ELSE 0 END) as Plasma,
             SUM(CASE WHEN Specimen_Type = 'Serum' THEN 1 ELSE 0 END) as Serum,
             SUM(CASE WHEN Specimen_Type = 'Buffy_Coat' THEN 1 ELSE 0 END) as Buffy_Coat,
@@ -185,10 +190,12 @@ server<-function(input,output, session) {
   
   
   specimen_type <-reactive({
-    my_file() %>% group_by(Specimen_Type) %>% tally()
+    req(my_file())
+    my_file() %>% dplyr::group_by(Specimen_Type) %>% tally()
   }) 
   
   sub_dataset <- reactive({
+    req(input$year,input$proj)
     # Filter data based on selected year
     if (input$year == "All Years") {
       if(input$proj == "All Projects"){
@@ -206,6 +213,8 @@ server<-function(input,output, session) {
     }
     
   })
+  
+  Valid_function <- function() {return(validate (need(nrow(my_file()) > 0, "No data found. Please upload your file in first page.")))}
   
   output$before_cleaned <-  renderTable({
     print(head(raw_combine()))
@@ -305,6 +314,7 @@ server<-function(input,output, session) {
   })
   
   output$Pie_specimen <- renderPlotly({
+    Valid_function()
     my_file() %>%
       count(Specimen_Type) %>%
       plot_ly(labels = ~Specimen_Type, values= ~n , type='pie' )
@@ -312,7 +322,8 @@ server<-function(input,output, session) {
   
   
   # Pie chart from gender------------------------------------------------
-  output$Pie_gender <- renderPlotly( {
+  output$Pie_gender <- renderPlotly({
+    Valid_function()
     my_file() %>%
       group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
       plot_ly(labels = ~Participant_Gender, type = "pie")
@@ -321,6 +332,7 @@ server<-function(input,output, session) {
   
   # Pie chart from Specimen_Pathological.Status--------------------------------
   output$Pie_status <- renderPlotly({
+    Valid_function()
     my_file() %>%
       group_by(Specimen_Pathological.Status) %>% tally() %>%
       plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie")
@@ -328,6 +340,7 @@ server<-function(input,output, session) {
   
   #line graph specimen type in each year
   output$Line_specimenType <- renderPlotly({
+    Valid_function()
     my_file() %>% count(Year,Specimen_Type) %>%
       dplyr::rename(sum_value = n) %>%
       plot_ly(x=~Year, y=~sum_value,color = ~Specimen_Type, type = "scatter" , mode = "lines+markers",
@@ -337,6 +350,7 @@ server<-function(input,output, session) {
   
   #barchart each specimen type group by project
   output$Bar_specimenType <- renderPlotly({
+    Valid_function()
     my_file() %>% count(Project,Specimen_Type) %>%
       dplyr::rename(sum_value = n) %>%
       plot_ly(x=~Project,y=~sum_value,color = ~Specimen_Type,type="bar")
@@ -345,16 +359,10 @@ server<-function(input,output, session) {
   
   
   #Highchart bar chart of specimen type query by year and project
-  output$Bar_specimen <- renderPlotly( {
-    
-    # Error message for when user has filtered out all data
-    validate (
-      need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
-    )
-    
+  output$Bar_specimen <- renderPlotly({
+    Valid_function()
+    #Plot
     specimens <- sub_dataset() %>% group_by(Specimen_Type) %>% tally()
-    
-    # Bar chart
     plot_ly(specimens, x= ~Specimen_Type ,y=~n , type = 'bar', name = 'Bar chart of specimen type from query year and project')
     
   })
@@ -362,14 +370,8 @@ server<-function(input,output, session) {
   
   #Highchart bar pie of gender query by year and project
   output$Pie_gender2 <- renderPlotly( {
-    
-    # Error message for when user has filtered out all data
-    validate (
-      need(nrow(sub_dataset()) > 0, "No data found. Please make another selection.")
-    )
-    
-    #plot Pie chart
-    
+    Valid_function()
+    #Plot
     sub_dataset() %>%
       group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
       plot_ly(labels = ~Participant_Gender, type = "pie")
@@ -378,27 +380,28 @@ server<-function(input,output, session) {
   
   # show summary table of query page2
   output$table_page2 <-renderDataTable({
+    Valid_function()
+    # show message in case of there are no any input from user
+    validate (
+      need(nrow(my_file()) > 0, "No data found. Please make another selection."))
     
     data_melt <-melt((df() %>% dplyr::select(Year,Project,Plasma,Serum,Buffy_Coat,Fresh_Tissue)), id = c("Year","Project"))
     
-    # Filter data based on selected Style
+    # Filter data based on selected year and project
     if (input$year == "All Years") {
-      data_melt <- data_melt
+      if(input$proj == "All Projects"){
+        data_melt<- data_melt
+      } else {
+        data_melt <- filter(data_melt, Project == input$proj)
+      }
+      
     } else {
-      data_melt <- filter(data_melt, Year == input$year)
+      if(input$proj == "All Projects"){
+        data_melt<- filter(data_melt, Year == input$year)
+      } else {
+        data_melt <- filter(data_melt, Project == input$proj & Year == input$year) 
+      }
     }
-    
-    # Filter data based on selected Country
-    if (input$project == "All Projects") {
-      data_melt <- data_melt
-    } else {
-      data_melt <- filter(data_melt, Project == input$project)
-    }
-    
-    # Hide table when user has filtered out all data
-    validate (
-      need(nrow(data_melt()) > 0, "No data found. Please make another selection.")
-    )
     
     data_melt[,]
     
@@ -407,16 +410,9 @@ server<-function(input,output, session) {
   # Table summary -------------------------------------------------------------
   
   output$table_query <- renderDataTable({
-    
+    Valid_function()
     df()[,]
   })
-  
-  observeEvent(c(input$year, input$project),{
-    
-  }
-  
-  )
-  
   
   #update select output
   observe({ updateSelectInput(session,
