@@ -62,12 +62,13 @@ ui <- dashboardPage(
     tabItems(
       tabItem(tabName = "import",
               fluidRow(
-                span("Please upload file before navigate to the other pages",style="color:red"),
+                column(12,align="center", uiOutput("descrip")),
                 column(12,align="center", fileInput('my_file',label="Upload CSV. here", multiple = TRUE)),
-                column(12,align="center", textOutput("descrip")),
-                h4(strong("The data table you uploaded :")),
+                column(12,align="center", span("Please upload file before navigate to the other pages",style="color:red")),
+                verbatimTextOutput("file_checker"),
+                htmlOutput("before_text"),
                 tableOutput("before_cleaned"),
-                h4(strong("Cleaned data table :")),
+                htmlOutput("after_text"),
                 tableOutput("after_cleaned"),
                 downloadButton("download", "Download your report")
               )),
@@ -128,11 +129,22 @@ ui <- dashboardPage(
 
 
 server<-function(input,output, session) { 
+  
+  output$file_checker <- renderText({
+    if (is.null(input$my_file))
+      return(NULL)
+    shiny::validate(
+      need(ncol(input$my_file) != 14, "Your data doesn't match the format required. Please check as follows
+    The data has a number of columns: 14
+         The columns name has the following columns:Participant_PPID,Participant_Registration.Date,Participant_Gender,Visit_Clinical.Diagnosis..Deprecated.,
+         Visit_Name,Specimen_Type,Specimen_Anatomic.Site,Specimen_Collection.Date,Specimen_Barcode,Specimen_Class,Specimen_Pathological.Status,Specimen_Container.Name,Specimen_Container.Position"))
+  })
+  
   raw_combine <- reactive({
     if (is.null(input$my_file))
       return(NULL)
     data.table::rbindlist(lapply(input$my_file$datapath, fread ),
-                          use.names = TRUE, fill = TRUE)
+                          use.names = TRUE, fill = FALSE)
   })
   
   my_file <- reactive({
@@ -218,18 +230,32 @@ server<-function(input,output, session) {
   
   Valid_function <- function() {return(validate (need(nrow(my_file()) > 0, "No data found. Please upload your file in first page.")))}
   
+  output$before_text <- renderText({
+    if (is.null(input$my_file))
+      return(NULL)
+    HTML(paste0("<h3>" , "The data table you uploaded :","</h3>"))
+  })
+  
   output$before_cleaned <-  renderTable({
     print(head(raw_combine()))
+  })
+  
+  output$after_text <- renderText({
+    if (is.null(input$my_file))
+      return(NULL)
+    HTML(paste0("<h3>" , "Cleaned data table :","</h3>"))
   })
   
   output$after_cleaned <- renderTable({
     print(head(my_file()))
   })
   
-  output$descrip <- renderText({
-    paste0("The functionality of this page will help prepare the uploaded data in the proper format.")
-    paste0("You have now uploaded the data : ",dim(raw_combine())[2],"  Columns  ", dim(raw_combine())[1],"  Rows" )
+  output$descrip <- renderUI({
+    str1 <- (paste("<h2>","The functionality of this page will help prepare the uploaded data in the proper format", "</h3>"))
+    str2 <- (paste("You have now uploaded the data : ",dim(raw_combine())[2],"  Columns  ", dim(raw_combine())[1],"  Rows" ))
+    HTML(paste(str1, str2, sep = '<br/>'))
   })
+  
   
   output$project_box <- renderInfoBox({
     infoBox(
