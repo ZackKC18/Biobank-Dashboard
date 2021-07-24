@@ -47,9 +47,16 @@ x <- seq(as.Date(max_date), to=as.Date(min_date), by='-6 months')[2]
 df <- data[data$Datetime > x &
              data$Datetime <= max_date, ]
 
-# random ------------------------------------------------------------------------------------------
+# random 45 samples ------------------------------------------------------------------------------------------
 
 set.seed(1)
 
 randdata <- sample_n(df, 45)
 randdata
+
+# random 45% of samples in 6 latest months
+
+set.seed(2)
+
+randdf <- df %>% sample_frac(.45)
+randdf
