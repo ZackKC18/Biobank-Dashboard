@@ -1,13 +1,9 @@
 library(shiny)
 library(dplyr)
 library(shinydashboard)
-#library(gridExtra)
-#library(grid)
-#library(tidyr)
 library(data.table)
-#library(tidyverse)
 library(plotly)
-library(epicalc)
+#library(epicalc)
 library(sqldf)
 library(reshape)
 library(officer)
@@ -130,16 +126,6 @@ ui <- dashboardPage(
 
 server<-function(input,output, session) { 
   
-  output$file_checker <- renderText({
-    if (is.null(input$my_file))
-      return(NULL)
-    shiny::validate(
-      need(ncol(input$my_file) != 14, "Your data doesn't match the format required. Please check as follows
-    The data has a number of columns: 14
-         The columns name has the following columns:Participant_PPID,Participant_Registration.Date,Participant_Gender,Visit_Clinical.Diagnosis..Deprecated.,
-         Visit_Name,Specimen_Type,Specimen_Anatomic.Site,Specimen_Collection.Date,Specimen_Barcode,Specimen_Class,Specimen_Pathological.Status,Specimen_Container.Name,Specimen_Container.Position"))
-  })
-  
   raw_combine <- reactive({
     if (is.null(input$my_file))
       return(NULL)
@@ -215,14 +201,14 @@ server<-function(input,output, session) {
       if(input$proj == "All Projects"){
         my_file<- my_file()
       } else {
-        my_file <- filter(my_file(), Project == input$proj)
+        my_file <- dplyr::filter(my_file(), Project == input$proj)
       }
       
     } else {
       if(input$proj == "All Projects"){
-        my_file<- filter(my_file(), Year == input$year)
+        my_file<- dplyr::filter(my_file(), Year == input$year)
       } else {
-        my_file <- filter(my_file(), Project == input$proj & Year == input$year) 
+        my_file <- dplyr::filter(my_file(), Project == input$proj & Year == input$year) 
       }
     }
     
@@ -342,7 +328,7 @@ server<-function(input,output, session) {
   })
   
   
-  # Pie chart from specimen type------------------------------------------------ 
+  # Pie chart from specimen type
   output$Pie_specimen <- renderPlotly({
     Valid_function()
     my_file() %>%
@@ -367,11 +353,11 @@ server<-function(input,output, session) {
   })
   
   
-  # Pie chart from gender------------------------------------------------
+  # Pie chart from gender
   output$Pie_gender <- renderPlotly({
     Valid_function()
     my_file() %>%
-      group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
+      dplyr::group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
       plot_ly(labels = ~Participant_Gender, type = "pie", 
               marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
@@ -392,11 +378,11 @@ server<-function(input,output, session) {
     gender_pie()
   })
   
-  # Pie chart from Specimen_Pathological.Status--------------------------------
+  # Pie chart from Specimen_Pathological.Status
   output$Pie_status <- renderPlotly({
     Valid_function()
     my_file() %>%
-      group_by(Specimen_Pathological.Status) %>% tally() %>%
+      dplyr::group_by(Specimen_Pathological.Status) %>% tally() %>%
       plot_ly(labels = ~Specimen_Pathological.Status,values = ~n, type = "pie",
               marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
@@ -418,6 +404,7 @@ server<-function(input,output, session) {
   
   #line graph specimen type in each year
   line_chart <- reactive({
+    Valid_function()
     my_file() %>%
       count(Year, Specimen_Type) %>% 
       dplyr::rename(sum_value = n) %>%
@@ -438,6 +425,7 @@ server<-function(input,output, session) {
   
   #barchart each specimen type group by project
   bar_chart <- reactive({
+    Valid_function()
     my_file() %>% count(Project,Specimen_Type) %>% 
       dplyr::rename(sum_value = n) %>%
       ggplot(aes(x = Project, y = sum_value, fill = Specimen_Type)) +
@@ -456,12 +444,12 @@ server<-function(input,output, session) {
   })
   
   
-  
+     
   #Highchart bar chart of specimen type query by year and project
   output$Bar_specimen <- renderPlotly({
     Valid_function()
     #Plot
-    specimens <- sub_dataset() %>% group_by(Specimen_Type) %>% tally()
+    specimens <- sub_dataset() %>% dplyr::group_by(Specimen_Type) %>% tally()
     plot_ly(specimens, x= ~Specimen_Type ,y=~n , type = 'bar',
             color = ~Specimen_Type, colors = brewer.pal(n = 4, name = "Pastel1"))
     
@@ -473,7 +461,7 @@ server<-function(input,output, session) {
     Valid_function()
     #Plot
     sub_dataset() %>%
-      group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
+      dplyr::group_by(Participant_PPID, Participant_Gender) %>% tally() %>%
       plot_ly(labels = ~Participant_Gender, type = "pie",
               marker = list(colors = brewer.pal(n = 3, name = "Pastel1"), line = list(color = '#FFFFFF', width = 1)))
   })
@@ -486,8 +474,8 @@ server<-function(input,output, session) {
     validate (
       need(nrow(my_file()) > 0, "No data found. Please make another selection."))
     
-    data_melt <-melt((df() %>% dplyr::select(Year,Project,Plasma,Serum,Buffy_Coat,Fresh_Tissue)), id = c("Year","Project"))
-    
+    data_melt <-  reshape::melt((df() %>% dplyr::select(Year,Project,Plasma,Serum,Buffy_Coat,Fresh_Tissue)), id = c("Year","Project"))
+   
     # Filter data based on selected year and project
     if (input$year == "All Years") {
       if(input$proj == "All Projects"){
@@ -508,7 +496,7 @@ server<-function(input,output, session) {
     
   })
   
-  # Table summary -------------------------------------------------------------
+  # Table summary
   
   output$table_query <- renderDataTable({
     Valid_function()
