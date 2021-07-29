@@ -6,9 +6,9 @@ library(plotly)
 #library(epicalc)
 library(sqldf)
 library(reshape)
-library(officer)
-library(rvg)
-library(flextable)
+#library(officer)
+#library(rvg)
+#library(flextable)
 library(RColorBrewer)
 
 options(shiny.maxRequestSize=30*1024^2) #increase server to 30 MB
