@@ -6,7 +6,7 @@ RUN apt-get update && \
     apt-get clean
 
 # Download and install library
-RUN R -e "install.packages(c('plotly', 'sqldf','dplyr','officer','reshape','data.table','shinydashboard','rvg','flextable','RColorBrewer'))"
+RUN R -e "install.packages(c('plotly', 'sqldf','dplyr','officer','reshape','libxml2','data.table','shinydashboard','xml2','rvg','flextable','RColorBrewer'))"
 
 RUN mkdir /root/app
 COPY BD /root/shiny_save
