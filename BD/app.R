@@ -189,6 +189,7 @@ server<-function(input,output, session) {
   })
   
   
+  
   specimen_type <-reactive({
     req(my_file())
     my_file() %>% dplyr::group_by(Specimen_Type) %>% tally()
