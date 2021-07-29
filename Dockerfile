@@ -9,7 +9,7 @@ RUN apt-get update && \
 RUN R -e "install.packages(c('plotly', 'sqldf','dplyr','officer','reshape','data.table','shinydashboard','rvg','flextable','RColorBrewer'))"
 
 RUN mkdir /root/app
-COPY app.R /root/shiny_save
+COPY BD /root/shiny_save
 
 
 # expose port
